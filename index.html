@@ -1,0 +1,285 @@
+<head>
+	<link href='http://fonts.googleapis.com/css?family=Open+Sans|Raleway' rel='stylesheet' type='text/css'>
+	<style>
+    html, body, #map-canvas {
+      height: 100%;
+      margin: 0px;
+      padding: 0px;
+			font-family: 'Raleway', sans-serif;
+			z-index:1;
+    }
+  
+		#draggable {
+			z-index:100; 
+			background-color: rgba(200,200,255,.7); 
+			width: 250px;
+			padding: 20px;
+			position:absolute;
+			top:10px;
+			left:100px;
+			cursor: move;
+			border: black 1px solid;
+		}
+
+		#radius-label, #opacity-label, #max-label {
+			margin-top: 10px;
+		}
+
+		#radius-slider, #opacity-slider, #max-slider {
+			width:250px;
+			margin-top: 10px;
+		}
+
+		#radius-label, #opacity-label, #timebar-label {
+			margin-top: 10px;
+		}
+
+		#radius-slider, #opacity-slider, #timebar-slider {
+			width:250px;
+			margin-top: 10px;
+		}
+
+
+		#project {
+			font-size: 10pt;
+			font-weight: bold;
+			margin-bottom: 10px;
+		}
+
+		#radius-slider .ui-slider-handle, 
+		#opacity-slider .ui-slider-handle,
+		#max-slider .ui-slider-handle {
+			cursor:pointer;
+		}
+  </style>
+	
+	<script src="./papaparse.min.js"></script>
+	<script src="./api/APIKey.js"></script>
+	<script src="./jquery-2.1.1.min.js"></script>
+	<script src="https://code.jquery.com/ui/1.11.0/jquery-ui.js"></script>
+	<link rel="stylesheet" href="https://code.jquery.com/ui/1.11.0/themes/smoothness/jquery-ui.css">
+<!--  -->
+	<script>
+		var map, pointarray, heatmap;
+		var mainMap = {};
+
+
+    // http://stackoverflow.com/a/2901298/562440
+		function numberWithCommas(x) {
+				return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+		}
+		function autoLoadCSV(){
+			Papa.parse("./testHeatMap.csv", {
+				download: true,
+				header: true,
+				dynamicTyping: true,
+				complete: function(results) {
+					csv = [];
+					var _mink;
+
+					if(results.meta.fields.indexOf("weight") == -1) {
+						for(idx in results["data"]) {
+							var row = results["data"][idx];
+							csv.push(new google.maps.LatLng(row["lat"], row["lon"]))
+						}
+					} else {
+						var max = results["data"][0]["weight"];
+						var _maxk = results["data"][0]["interval"];
+						for(idx in results["data"]) {
+							var row = results["data"][idx];
+							max = Math.max(max, row["weight"]);
+							_maxk = Math.max(_maxk, row["interval"]);
+							var _h = row["interval"]
+							if (_h in mainMap){
+								mainMap[_h].push({
+									location: new google.maps.LatLng(row["lat"], row["lon"]),
+									weight: row["weight"]
+								});
+							}else{
+								mainMap[_h]=[];
+								mainMap[_h].push({
+									location: new google.maps.LatLng(row["lat"], row["lon"]),
+									weight: row["weight"]
+								});
+							}						}
+
+						$("#max-label").html("max: "+numberWithCommas(max));
+						$("#max-slider").slider("option","max",max);
+						$("#max-slider").slider("option","value",max);
+
+						$("#timebar-label").html("hour: "+numberWithCommas(_maxk));
+						$("#timebar-slider").slider("option","max",_maxk);
+						$("#timebar-slider").slider("option","value",_maxk);
+					}
+					console.log(results);
+					loadHeatmap(mainMap[_maxk]);
+				}
+			});
+		}
+
+		function handleFileSelect(evt) {
+			// alert(jQuery.type(evt))
+			var file = evt.target.files[0];
+			Papa.parse(file, {
+				header: true,
+				dynamicTyping: true,
+				complete: function(results) {
+					csv = [];
+					var _mink;
+
+					if(results.meta.fields.indexOf("weight") == -1) {
+						for(idx in results["data"]) {
+							var row = results["data"][idx];
+							csv.push(new google.maps.LatLng(row["lat"], row["lon"]))
+						}
+					} else {
+						var max = results["data"][0]["weight"];
+						var _maxk = results["data"][0]["interval"];
+						for(idx in results["data"]) {
+							var row = results["data"][idx];
+							max = Math.max(max, row["weight"]);
+							_maxk = Math.max(_maxk, row["interval"]);
+							var _h = row["interval"]
+							if (_h in mainMap){
+								mainMap[_h].push({
+									location: new google.maps.LatLng(row["lat"], row["lon"]),
+									weight: row["weight"]
+								});
+							}else{
+								mainMap[_h]=[];
+								mainMap[_h].push({
+									location: new google.maps.LatLng(row["lat"], row["lon"]),
+									weight: row["weight"]
+								});
+							}						}
+
+						$("#max-label").html("max: "+numberWithCommas(max));
+						$("#max-slider").slider("option","max",max);
+						$("#max-slider").slider("option","value",max);
+
+						$("#timebar-label").html("hour: "+numberWithCommas(_maxk));
+						$("#timebar-slider").slider("option","max",_maxk);
+						$("#timebar-slider").slider("option","value",_maxk);
+					}
+					console.log(results);
+					loadHeatmap(mainMap[_maxk]);
+				}
+			});
+		}
+		
+		function initialize() {
+		  var mapOptions = {
+			zoom: 13,
+			center: new google.maps.LatLng(25.0365247,121.5109358)
+		  };
+
+		  map = new google.maps.Map(document.getElementById('map-canvas'),
+			  mapOptions);
+		  autoLoadCSV();
+		}
+		
+		function loadHeatmap(csv) {
+			var pointArray = new google.maps.MVCArray(csv);
+
+			if(heatmap) heatmap.setMap(null);
+			
+			heatmap = new google.maps.visualization.HeatmapLayer({
+				data: pointArray,
+				radius: $("#radius-slider").slider("value"),
+				opacity: $("#opacity-slider").slider("value")
+			});
+			
+			heatmap.setMap(map);
+		}
+
+		
+		$(document).ready(function(){
+			$.getScript("https://maps.googleapis.com/maps/api/js?v=3.exp&libraries=visualization&key="+mAPIkey, function(){
+				google.maps.event.addDomListener(window, 'load', initialize);
+			});
+			$("#csv-file").change(handleFileSelect);
+			
+			
+			$(function() {
+				$( "#draggable" ).draggable();
+			});
+			
+			$(function() {
+				$( "#radius-slider" ).slider({
+					orientation: "horizontal",
+					range: "min",
+					min: 1,
+					max: 50,
+					value: 20,
+					slide: function(event, ui) {
+						$("#radius-label").html("radius: " + ui.value);
+						if(heatmap == null) return;
+						heatmap.set('radius', ui.value);
+					}
+				});
+
+				$( "#opacity-slider" ).slider({
+					orientation: "horizontal",
+					range: "min",
+					min: 0,
+					max: 100,
+					value: 50,
+					slide: function(event, ui) {
+						$("#opacity-label").html("opacity: " + ui.value/100);
+						if(heatmap == null) return;
+						heatmap.set('opacity', ui.value/100);
+					}
+				});
+
+				$( "#max-slider" ).slider({
+					orientation: "horizontal",
+					range: "min",
+					min: 0,
+					max: 1,
+					value: 0,
+					slide: function(event, ui) {
+						$("#max-label").html("max: " + numberWithCommas(ui.value));
+						if(heatmap == null) return;
+						heatmap.set('maxIntensity', ui.value);
+					}
+				});
+
+				$( "#timebar-slider" ).slider({
+					orientation: "horizontal",
+					range: "min",
+					min: 0,
+					max: 1,
+					value: 0,
+					slide: function(event, ui) {
+						$("#timebar-label").html("hour: " + numberWithCommas(ui.value));
+						if(heatmap == null) return;
+						loadHeatmap(mainMap[ui.value]);
+					}
+				});
+
+			});
+		});
+	</script>
+</head>
+<body>
+  <!-- there goes the map -->
+	<div id="map-canvas"> </div>
+
+  <!-- the draggable input and display controls -->
+	<div id="draggable">
+		<input type="file" id="csv-file" name="files"/>
+		<div id="radius-label">radius: 20</div>
+		<div id="radius-slider"></div>
+
+		<div id="opacity-label">opacity: 0.5</div>
+		<div id="opacity-slider"></div>
+
+		<div id="max-label">max: -</div>
+		<div id="max-slider"></div>
+
+		<div id="timebar-label">hour: -</div>
+		<div id="timebar-slider"></div>
+
+	</div>
+</body>
+
