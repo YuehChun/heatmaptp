@@ -1,4 +1,5 @@
 <head>
+	<title>HeatMap in Taipei</title>
 	<link href='http://fonts.googleapis.com/css?family=Open+Sans|Raleway' rel='stylesheet' type='text/css'>
 	<style>
     html, body, #map-canvas {
@@ -69,7 +70,7 @@
 				return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 		}
 		function autoLoadCSV(){
-			Papa.parse("./testHeatMap.csv", {
+			Papa.parse("./data/testHeatMap.csv", {
 				download: true,
 				header: true,
 				dynamicTyping: true,
